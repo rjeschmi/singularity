@@ -39,6 +39,7 @@
 
 int singularity_image_create(char *image, int size) {
     FILE *image_fp;
+    int  image_fd;
     char *buff = (char *) malloc(1024*1024);
     int i;
 
@@ -57,13 +58,15 @@ int singularity_image_create(char *image, int size) {
 
     singularity_message(VERBOSE2, "Writing image header\n");
     fprintf(image_fp, LAUNCH_STRING); // Flawfinder: ignore (LAUNCH_STRING is a constant)
-
+    fflush(image_fp);
+    image_fd = fileno(image_fp);
+    long long int byte_size = (long long int) size*(1024*1024);
+    fprintf(stderr, "size: %lli byte_size: %lli\n", size, byte_size);
     singularity_message(VERBOSE2, "Expanding image to %dMB\n", size);
-    for(i = 0; i < size; i++ ) {
-        if ( fwrite(buff, 1, 1024*1024, image_fp) < 1024 * 1024 ) {
-            singularity_message(ERROR, "Failed allocating space to image: %s\n", strerror(errno));
-            ABORT(255);
-        }
+    if(ftruncate64(image_fd, byte_size) < 0) {
+        fprintf(stderr, "ERROR: %d\n", errno);
+        singularity_message(ERROR, "Failed allocating space to image: %s\n", strerror(errno));
+        ABORT(255);
     }
 
     singularity_message(VERBOSE2, "Making image executable\n");
